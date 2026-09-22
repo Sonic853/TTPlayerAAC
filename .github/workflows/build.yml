@@ -26,20 +26,23 @@ jobs:
       run:
         shell: pwsh
     outputs:
-      release_date: ${{ steps.release_date.outputs.value }}
+      release_version: ${{ steps.version.outputs.version }}
+      previous_version: ${{ steps.version.outputs.previous }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - name: Capture Beijing build date
-        id: release_date
+      - name: Allocate Beijing date version before compilation
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_REQUESTED: ${{ inputs.release_a_version }}
         run: |
-          $releaseDate = [DateTimeOffset]::UtcNow.ToOffset([TimeSpan]::FromHours(8)).ToString(
-            'yyyy.MM.dd', [Globalization.CultureInfo]::InvariantCulture)
-          "value=$releaseDate" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          ./cmake/resolve_release_version.ps1 -Repository $env:GITHUB_REPOSITORY `
+            -ReleaseRequested:($env:RELEASE_REQUESTED -eq 'true')
       - name: Build, audit system imports and package
         env:
-          PACKAGE_VERSION: ${{ steps.release_date.outputs.value }}
+          PACKAGE_VERSION: ${{ steps.version.outputs.version }}
           RELEASE_REQUESTED: ${{ inputs.release_a_version }}
         run: |
           ./build.ps1 -Package -SourcePackage:($env:RELEASE_REQUESTED -eq 'true') -PackageVersion $env:PACKAGE_VERSION
@@ -70,7 +73,8 @@ jobs:
       run:
         shell: pwsh
     env:
-      RELEASE_DATE: ${{ needs.build.outputs.release_date }}
+      RELEASE_VERSION: ${{ needs.build.outputs.release_version }}
+      PREVIOUS_VERSION: ${{ needs.build.outputs.previous_version }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -79,17 +83,14 @@ jobs:
         with:
           name: ttp_aac-x86-Release-${{ github.run_number }}
           path: artifact
-      - name: Allocate release version
-        id: prepare
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Verify packages and prepare release notes
         run: |
-          ./cmake/prepare_release.ps1 -ReleaseDate $env:RELEASE_DATE -Repository $env:GITHUB_REPOSITORY `
+          ./cmake/prepare_release.ps1 -Version $env:RELEASE_VERSION -PreviousVersion $env:PREVIOUS_VERSION `
+            -Repository $env:GITHUB_REPOSITORY `
             -Commit $env:GITHUB_SHA -ServerUrl $env:GITHUB_SERVER_URL
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_VERSION: ${{ steps.prepare.outputs.version }}
         run: |
           $ErrorActionPreference = 'Stop'
           $version = $env:RELEASE_VERSION

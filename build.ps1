@@ -5,10 +5,12 @@ param(
     [string[]]$CMakeArguments = @(),
     [switch]$Package,
     [switch]$SourcePackage,
-    [string]$PackageVersion = ([DateTimeOffset]::UtcNow.ToOffset([TimeSpan]::FromHours(8)).ToString(
-        'yyyy.MM.dd', [Globalization.CultureInfo]::InvariantCulture))
+    [string]$PackageVersion
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'cmake/version.ps1')
+# Capture once before compilation, including the Actions same-day patch suffix.
+$PackageVersion = (Get-AacBuildVersion $PackageVersion).Name
 function Invoke-CMake([string[]]$Arguments) {
     # Windows PowerShell 5 treats redirected native stderr as ErrorRecord even
     # for CMake's successful status messages. The process exit code is decisive.
@@ -20,15 +22,12 @@ function Invoke-CMake([string[]]$Arguments) {
     } finally { $ErrorActionPreference = $previous }
     if ($code -ne 0) { throw "CMake failed ($code): $Arguments" }
 }
-Invoke-CMake (@('-S',$PSScriptRoot,'-B',$BuildDirectory,'-G',$Generator,'-A','Win32') + $CMakeArguments)
+Invoke-CMake (@('-S',$PSScriptRoot,'-B',$BuildDirectory,'-G',$Generator,'-A','Win32') + $CMakeArguments +
+    @("-DTTP_AAC_BUILD_VERSION=$PackageVersion"))
 Invoke-CMake @('--build',$BuildDirectory,'--config','Release','--target','ttp_aac','--parallel','4')
+Assert-AacFileVersion (Join-Path $BuildDirectory 'Release/ttp_aac.dll') $PackageVersion
 if (-not ($Package -or $SourcePackage)) { return }
 
-if ($PackageVersion -notmatch '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}(?:p[1-9][0-9]*)?$') {
-    throw 'PackageVersion must use yyyy.MM.dd or yyyy.MM.ddpN.'
-}
-$null = [datetime]::ParseExact(($PackageVersion -split 'p')[0], 'yyyy.MM.dd',
-    [Globalization.CultureInfo]::InvariantCulture)
 $output = Join-Path $BuildDirectory 'Release'
 $stage = Join-Path $BuildDirectory ('package-' + [guid]::NewGuid().ToString('N'))
 $binary = Join-Path $stage 'binary'
@@ -49,6 +48,8 @@ if ($SourcePackage) {
                          '.clang-format','cmake','src','include','docs','.github')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $entry) -Destination $source -Recurse
     }
+    # Preserve the resource version when rebuilding this source archive later.
+    $PackageVersion | Set-Content -LiteralPath (Join-Path $source 'BUILD_VERSION') -Encoding ASCII
     $notices = Join-Path $source 'third_party/faad2'
     $decoderSource = Join-Path $notices 'source'
     New-Item -ItemType Directory -Path $decoderSource -Force | Out-Null

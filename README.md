@@ -1,7 +1,7 @@
 # ttp_aac
 
-TTPlayer 重建版的独立 AAC／MP4 插件工程，接口／资源版本 **0.1.0**。
-发行包版本采用与 rebuild Actions 相同的北京时间日期及同日补丁编号。
+TTPlayer 重建版的独立 AAC／MP4 插件工程。
+DLL 文件／产品版本与发行包统一采用 Actions 的北京时间日期及同日补丁编号。
 插件源码、构建脚本和发行包位于本工程；FAAD2 解码核心在构建时下载固定版本，运行时不加载原 `ttp_aac.dll`。
 
 ## 功能
@@ -42,9 +42,11 @@ FAAD2 源码不提交到 Git；仓库保留完整许可、作者信息、来源�
 该源码包包含本工程与实际使用的 FAAD2 解码源码，可独立构建，不需要再次下载 FAAD2；
 VC-LTL、YY-Thunks 仍按固定版本获取。运行 ZIP 的内容不变。
 
-可用 `-PackageVersion '2026.09.22p1'` 指定包名版本；本地构建默认使用北京时间日期。
-日期版本用于包名和发布标签，DLL 的接口／资源版本仍为 `0.1.0`，与 rebuild 区分
-CMake 工程版本和发行日期的方式一致。
+可用 `-PackageVersion '2026.09.22p1'` 同时指定 DLL 文件／产品版本与包名版本；
+本地仓库构建默认使用北京时间日期。Windows 字符串版本为 `2026.09.22p1`，
+四段数字版本为 `2026.9.22.1`；无 `pN` 时最后一段为 `0`。
+源码发行包中的 `BUILD_VERSION` 保存原发行版本，日后重建默认沿用，可用上述参数覆盖。
+具体规则见 [日期构建版本](docs/BUILD_VERSION.md)。
 
 已有依赖缓存可通过 `-CMakeArguments` 传入
 `-DFETCHCONTENT_SOURCE_DIR_TTPLAYER_YY_THUNKS=...` 和
@@ -58,6 +60,10 @@ CMake 工程版本和发行日期的方式一致。
 cmake -S . -B build -G 'Visual Studio 18 2026' -A Win32
 cmake --build build --config Release --target ttp_aac --parallel 4
 ```
+
+直接使用 CMake 时，`-DTTP_AAC_BUILD_VERSION=2026.09.22p1` 可固定版本；
+设为 `-DTTP_AAC_BUILD_VERSION=` 可清除缓存中的固定值，恢复每次构建按北京时间取日期
+（源码发行包优先使用 `BUILD_VERSION`）。
 
 ## 安装与重建版接入
 
@@ -77,6 +83,7 @@ Actions 手动运行时始终构建、检查系统导入和打包，不运行测
 
 - 版本与 rebuild 一致：北京时间 `yyyy.MM.dd`；同日已有标签或 Release 时使用 `p1`、`p2` 等数字递增后缀。
 - 查询全部分页标签和 Release（包含草稿占用），按数值选择下一个编号；发布任务串行防止重复分配。
+- 最终版本在编译前确定，并用于 DLL 属性、运行／源码 ZIP 和 Release 标签；发布阶段不再重命名 ZIP。
 - 发布附件为运行 ZIP、独立的 `ttp_aac-版本号-source.zip` 和两份 ZIP 的 `SHA256SUMS.txt`。
 - 运行 ZIP 只有 DLL 与校验文件；源码 ZIP 提供 FAAD2 对应源码、适配脚本及许可证，不包含本地测试、样本或构建产物。
 - Release 说明链接到本次构建提交的源码、许可证和构建说明；不覆盖已有 Release。

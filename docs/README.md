@@ -4,6 +4,7 @@
 
 - [安装说明](INSTALL.md)
 - [独立构建与实现状态](AAC_PLUGIN_IMPLEMENTATION.md)
+- [DLL 与 Actions 日期构建版本](BUILD_VERSION.md)
 - [插件恢复记录、接口映射与支持范围](RECONSTRUCTION.md)
 
 ## 原插件分析

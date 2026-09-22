@@ -9,6 +9,7 @@
 
 ## 原插件分析
 
+- [原版 AAC 插件的 FAAD2 来源与 GPL 分析](ORIGINAL_AAC_GPL_ANALYSIS.md)
 - [分片 MP4 无法播放的原因](FRAGMENTED_MP4_AAC_ANALYSIS.md)
 - [根据伪代码与二进制重建插件的可行性](AAC_PLUGIN_REBUILD_FEASIBILITY.md)
 

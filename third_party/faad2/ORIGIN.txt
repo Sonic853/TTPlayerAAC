@@ -1,11 +1,21 @@
-Source: https://codeload.github.com/knik0/faad2/zip/refs/tags/FAAD2_2_7
-Archive SHA-256: c0ea38f8bdeff2e8e5d436982cfd8235b24ea4db31d2f9087a6c33dcc9b9d440
-Tag: FAAD2_2_7
-Scope: decoder C sources, headers, original notices.
-Local modifications:
-- common.h: rename the MSVC inline lrintf helper to faad_lrintf to avoid a
+Source: https://codeload.github.com/knik0/faad2/zip/refs/tags/2.11.3
+Archive SHA-256: 778d6d457423ad411c83aba05007f5ea6f9d646aead71d1ce11455ea15132cb8
+Tag: 2.11.3
+Scope: decoder C sources and headers, downloaded during CMake configuration.
+The Git repository retains COPYING, AUTHORS and this origin/modification record.
+cmake/faad2.cmake verifies the archive SHA-256 and adapts a build-local copy.
+Release source archives include the upstream decoder sources under source/.
+License: GPL-2.0-or-later; see COPYING and the original per-file notices.
+Code from FAAD2 is copyright (c) Nero AG, www.nero.com
+Local modifications (TTPlayer Rebuild, 2026-09-22):
+- include/neaacdec.h: FAAD_STATIC disables dllexport for static embedding in ttp_aac.
+  It does not change the calling convention or public decoder data structures.
+- libfaad/common.h: rename the MSVC inline lrintf helper to faad_lrintf to avoid a
   collision with the modern compiler's intrinsic. Keep the original x87 body.
-- mdct.c, syntax.c: convert legacy-encoded comments to UTF-8.
-Build: x86, floating-point output, /O2 /fp:precise /arch:SSE2.
+  Include CRT math declarations before the alias so XP UCRT prototypes are
+  not renamed to the private helper.
+Build: x86, floating-point output, APPLY_DRC=1, /O1 /Ob2 /Os /GL,
+       /fp:precise /arch:SSE2, VC-LTL 5.3.1 and YY-Thunks 1.2.2.
 The wrapper derives original NeAACDecInit2's additional frame-length result
 from AudioSpecificConfig, without changing the public upstream decoder ABI.
+PCM validation uses the 2.11.3 baseline; it is not bit-identical to FAAD2 2.7.

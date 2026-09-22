@@ -1,8 +1,23 @@
 name: Build AAC plugin
+run-name: AAC x86 Release - ${{ github.ref_name }}
+
 on:
   workflow_dispatch:
+    inputs:
+      release_a_version:
+        description: Release a Version (GitHub)
+        type: boolean
+        required: false
+        default: false
+
 permissions:
   contents: read
+
+# Reserve the version until publication finishes. Build-only runs are independent.
+concurrency:
+  group: ${{ inputs.release_a_version && 'manual-aac-release' || format('manual-aac-build-{0}', github.run_id) }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: windows-2025-vs2026
@@ -10,18 +25,88 @@ jobs:
     defaults:
       run:
         shell: pwsh
+    outputs:
+      release_date: ${{ steps.release_date.outputs.value }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+      - name: Capture Beijing build date
+        id: release_date
+        run: |
+          $releaseDate = [DateTimeOffset]::UtcNow.ToOffset([TimeSpan]::FromHours(8)).ToString(
+            'yyyy.MM.dd', [Globalization.CultureInfo]::InvariantCulture)
+          "value=$releaseDate" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
       - name: Build, audit system imports and package
-        run: ./build.ps1 -Package
+        env:
+          PACKAGE_VERSION: ${{ steps.release_date.outputs.value }}
+          RELEASE_REQUESTED: ${{ inputs.release_a_version }}
+        run: |
+          ./build.ps1 -Package -SourcePackage:($env:RELEASE_REQUESTED -eq 'true') -PackageVersion $env:PACKAGE_VERSION
+          New-Item -ItemType Directory -Path artifact | Out-Null
+          Copy-Item -LiteralPath "build/Release/ttp_aac-$env:PACKAGE_VERSION.zip",'build/Release/SHA256SUMS.txt' -Destination artifact
+          if ($env:RELEASE_REQUESTED -eq 'true') {
+            Copy-Item -LiteralPath "build/Release/ttp_aac-$env:PACKAGE_VERSION-source.zip" -Destination artifact
+          }
       # Tests and private reconstruction evidence remain in ../rebuild/tests.
-      # This standalone workflow builds and packages only.
+      # The runtime ZIP contains only the DLL and checksum. A separate source
+      # archive accompanies releases because FAAD2 is fetched during the build.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: ttp_aac-x86-XP-Win7-modern
-          path: |
-            build/Release/ttp_aac-*.zip
-            build/Release/SHA256SUMS.txt
+          name: ttp_aac-x86-Release-${{ github.run_number }}
+          path: artifact/
           if-no-files-found: error
+          retention-days: 14
+
+  github_release:
+    name: GitHub Release
+    needs: build
+    if: inputs.release_a_version
+    runs-on: windows-2025
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      RELEASE_DATE: ${{ needs.build.outputs.release_date }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ttp_aac-x86-Release-${{ github.run_number }}
+          path: artifact
+      - name: Allocate release version
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./cmake/prepare_release.ps1 -ReleaseDate $env:RELEASE_DATE -Repository $env:GITHUB_REPOSITORY `
+            -Commit $env:GITHUB_SHA -ServerUrl $env:GITHUB_SERVER_URL
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.prepare.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = $env:RELEASE_VERSION
+          if ($version -notmatch '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}(?:p[1-9][0-9]*)?$') {
+            throw 'Missing or invalid release version.'
+          }
+          $archiveName = "ttp_aac-$version.zip"
+          $archive = "artifact/$archiveName"
+          $sourceName = "ttp_aac-$version-source.zip"
+          $sourceArchive = "artifact/$sourceName"
+          $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          $sourceHash = (Get-FileHash -LiteralPath $sourceArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+          $expected = (Get-Content -LiteralPath artifact/SHA256SUMS.txt -Raw).Trim() -replace "`r", ''
+          if ($expected -cne "$hash  $archiveName`n$sourceHash  $sourceName") {
+            throw 'Prepared AAC package SHA-256 verification failed.'
+          }
+          gh release create "$version" $archive $sourceArchive artifact/SHA256SUMS.txt `
+            --repo "$env:GITHUB_REPOSITORY" --target "$env:GITHUB_SHA" `
+            --title "$version" --notes-file artifact/release-notes.md
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub publication failed; existing releases are not overwritten.' }

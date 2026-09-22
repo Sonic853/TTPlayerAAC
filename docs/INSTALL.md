@@ -1,4 +1,4 @@
-# ttp_aac 0.1.0 安装
+# ttp_aac 安装
 
 关闭播放器，将插件 ZIP 解压至播放器目录，使 `AddIn/ttp_aac.dll` 覆盖原同名插件。
 普通版及 XP SP3／Win7 版使用同一 x86 DLL，CPU 需要 SSE2。
@@ -10,5 +10,9 @@
 详细恢复与验证见同目录 [RECONSTRUCTION.md](RECONSTRUCTION.md)。
 分片 MP4 的标签／封面仅支持读取。XP SP3 x86 与 Win7 SP1 x64 已完成实际解码、定位、标签／PNG 封面和 Nero 编码验证；XP 中也已用原版 5.7.9 和重建版实际播放问题分片文件。
 
-对应源码包为 `ttp_aac-0.1.0-source.zip`，包含本插件及 FAAD2 核心源码、CMake、构建脚本和依赖来源。
-发行时同时提供该源码包，并保留 `licenses/ttp_aac` 下的许可证。
+发行包名为 `ttp_aac-yyyy.MM.dd.zip`，同日再次发布追加 `p1`、`p2` 等后缀，与 rebuild 一致。
+ZIP 内仅包含 `AddIn/ttp_aac.dll` 和校验该 DLL 的 `SHA256SUMS.txt`。
+Release 附件中的另一份 `SHA256SUMS.txt` 用于校验运行 ZIP 和独立源码 ZIP。
+FAAD2 已升级为 2.11.3，源码在构建时下载，不提交 Git；完整许可证和适配脚本保留在仓库。
+`ttp_aac-版本号-source.zip` 提供实际使用的 FAAD2 解码源码及本工程构建脚本，见 [许可说明](LICENSING.md)。
+现代工具链生成的同一 DLL 兼容 XP／Win7，用户无需安装 VC++ 2012、VC-LTL 或 YY-Thunks。

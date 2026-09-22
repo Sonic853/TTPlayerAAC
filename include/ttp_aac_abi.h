@@ -1,4 +1,9 @@
 #pragma once
+#if defined(_USING_V110_SDK71_)
+// SDK 7.1A's IID_PPV_ARGS_Helper names IUnknown before its declaration.
+// Make the old SDK header valid with MSVC's /permissive- name lookup.
+struct IUnknown;
+#endif
 #include <windows.h>
 #include <mmreg.h>
 #include <objidl.h>

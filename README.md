@@ -1,7 +1,8 @@
 # ttp_aac
 
-TTPlayer 重建版的独立 AAC／MP4 插件工程，版本 **0.1.0**。
-源码、解码核心、构建脚本和插件发行包均在本工程内；运行时不加载原 `ttp_aac.dll`。
+TTPlayer 重建版的独立 AAC／MP4 插件工程，接口／资源版本 **0.1.0**。
+发行包版本采用与 rebuild Actions 相同的北京时间日期及同日补丁编号。
+插件源码、构建脚本和发行包位于本工程；FAAD2 解码核心在构建时下载固定版本，运行时不加载原 `ttp_aac.dll`。
 
 ## 功能
 
@@ -14,12 +15,17 @@ TTPlayer 重建版的独立 AAC／MP4 插件工程，版本 **0.1.0**。
 分片 MP4 的标签／封面目前只读。在线 DASH、DRM、不可定位的网络流不在本版支持范围。
 ADIF、AAC Main/SSR/LD 等缺少完整实测样本，不能据此声称与原 DLL 所有分支完全一致。
 恢复依据、验证记录及具体限制见 [RECONSTRUCTION.md](docs/RECONSTRUCTION.md)。
+全部 AAC 分析、构建对比与兼容性记录见 [文档目录](docs/README.md)。
 
 ## 构建
 
 需要 Visual Studio C++ x86 工具、Windows SDK、CMake、Python 3。
 默认使用 VS 2026（要求 CMake 4.2+）；也可传 `-Generator 'Visual Studio 17 2022'`。
-首次配置下载带 SHA-256 校验的 VC-LTL 5.3.1 与 YY-Thunks 1.2.2。
+首次配置下载带 SHA-256 校验的 FAAD2 **2.11.3**、VC-LTL 5.3.1 与 YY-Thunks 1.2.2。
+FAAD2 源码不提交到 Git；仓库保留完整许可、作者信息、来源记录及构建适配脚本。
+采用现代 MSVC + VC-LTL + YY-Thunks；不需要 VS2019 Build Tools 或 `v141_xp`。
+默认按体积优化：C++17、`/O1 /Ob2 /Os /GL`、链接时优化和未使用代码移除，
+保留 `/fp:precise`、异常处理及 SSE2。VS2026 实测 DLL 为 **361 KiB**。
 
 ```powershell
 ./build.ps1 -Package
@@ -28,13 +34,23 @@ ADIF、AAC Main/SSR/LD 等缺少完整实测样本，不能据此声称与原 DL
 输出在 `build/Release`：
 
 - `ttp_aac.dll`：实际插件。
-- `ttp_aac-0.1.0.zip`：`AddIn/ttp_aac.dll`、许可证、说明及导入检查报告。
-- `ttp_aac-0.1.0-source.zip`：与二进制对应的独立工程源码及构建脚本。
-- `SHA256SUMS.txt`：发行包校验值。
+- `ttp_aac-yyyy.MM.dd.zip`：仅 `AddIn/ttp_aac.dll` 和 `SHA256SUMS.txt`；包内校验 DLL。
+- `SHA256SUMS.txt`：ZIP 的校验值。
+- `legacy-imports.json`：留在本地构建目录的 XP／Win7 导入检查报告，不加入 ZIP。
+
+发布时使用 `./build.ps1 -Package -SourcePackage`，另生成 `ttp_aac-yyyy.MM.dd-source.zip`。
+该源码包包含本工程与实际使用的 FAAD2 解码源码，可独立构建，不需要再次下载 FAAD2；
+VC-LTL、YY-Thunks 仍按固定版本获取。运行 ZIP 的内容不变。
+
+可用 `-PackageVersion '2026.09.22p1'` 指定包名版本；本地构建默认使用北京时间日期。
+日期版本用于包名和发布标签，DLL 的接口／资源版本仍为 `0.1.0`，与 rebuild 区分
+CMake 工程版本和发行日期的方式一致。
 
 已有依赖缓存可通过 `-CMakeArguments` 传入
 `-DFETCHCONTENT_SOURCE_DIR_TTPLAYER_YY_THUNKS=...` 和
-`-DFETCHCONTENT_SOURCE_DIR_TTPLAYER_VC_LTL=...`。
+`-DFETCHCONTENT_SOURCE_DIR_TTPLAYER_VC_LTL=...`，或通过
+`-DFETCHCONTENT_SOURCE_DIR_TTPLAYER_FAAD2=...` 指向已解压的原版 2.11.3 源码。
+兼容适配只应用于构建目录内的副本，不修改下载缓存。
 
 也可直接运行 CMake：
 
@@ -48,19 +64,33 @@ cmake --build build --config Release --target ttp_aac --parallel 4
 关闭播放器，将二进制包解压至播放器目录，覆盖 `AddIn/ttp_aac.dll`，保留原来的其他插件。
 新插件自行解码 AAC，无需 Media Foundation；Nero 编码组件不随本工程发行。
 
-与 `rebuild` 并排放置时，重建版 CMake 可通过 `TTPLAYER_BUILD_AAC_PLUGIN=ON` 自动独立构建、
-复制新 DLL；可用 `TTPLAYER_AAC_PROJECT_DIR` 指定其他源码位置。
-播放器与插件仍是独立工程，插件的 XP 运行库设置不会改变普通版 EXE 的设置。
+`ttp_aac` 与 `rebuild` 分别配置、构建、打包及发布，彼此没有 CMake 构建依赖。
+rebuild 不会触发插件编译或自动复制本工程产物；安装新插件时单独解压插件 ZIP。
+插件的 XP 运行库设置只用于本工程。
 
 ## 测试与 Actions
 
 所有本地测试代码、样本、伪代码和原 DLL 对照材料只保存在 `../rebuild/tests/aac_rebuild`
-与 `../rebuild/tests/media_analysis`，不包含于本工程或源码包。
-独立工程的 Actions 只构建、检查系统导入和打包，不运行测试，不自动发布 release。
+与 `../rebuild/tests/media_analysis`，不包含于本工程或发行包。
+Actions 手动运行时始终构建、检查系统导入和打包，不运行测试。
+勾选 **Release a Version (GitHub)** 才会发布 GitHub Release：
+
+- 版本与 rebuild 一致：北京时间 `yyyy.MM.dd`；同日已有标签或 Release 时使用 `p1`、`p2` 等数字递增后缀。
+- 查询全部分页标签和 Release（包含草稿占用），按数值选择下一个编号；发布任务串行防止重复分配。
+- 发布附件为运行 ZIP、独立的 `ttp_aac-版本号-source.zip` 和两份 ZIP 的 `SHA256SUMS.txt`。
+- 运行 ZIP 只有 DLL 与校验文件；源码 ZIP 提供 FAAD2 对应源码、适配脚本及许可证，不包含本地测试、样本或构建产物。
+- Release 说明链接到本次构建提交的源码、许可证和构建说明；不覆盖已有 Release。
 
 ## 来源与许可
 
 插件接口、文件处理和 Nero 适配根据原插件伪代码、机器码和运行对照重建。
-AAC 核心采用 FAAD2 `FAAD2_2_7`，保留原作者声明与 GPL 许可证；修改见
-[ORIGIN.txt](third_party/faad2/ORIGIN.txt)。本工程按 GPL-2.0-or-later 分发，详见 [LICENSE](LICENSE)。
-发行二进制时应同时提供对应源码包。VC-LTL、YY-Thunks 的许可证随二进制一起安装。
+AAC 核心采用 FAAD2 **2.11.3**，保留原作者声明与 GPL-2.0-or-later 许可证；修改见
+[ORIGIN.txt](third_party/faad2/ORIGIN.txt)。Code from FAAD2 is copyright (c) Nero AG, www.nero.com
+
+仓库根目录的 [MIT 许可证](LICENSE) 用于项目自有代码，不覆盖 FAAD2、VC-LTL、YY-Thunks。
+包含 FAAD2 的 DLL 整体分发须遵循其 GPL 条款，并提供对应源码；仅保留一行版权声明不够。
+详见 [第三方许可与源码分发](docs/LICENSING.md)。
+
+仓库保留必要的完整许可文本和来源记录；FAAD2 源码仅在构建目录及独立发行源码包中。
+FAAD2 许可证位于 `third_party/faad2/COPYING`，VC-LTL 和 YY-Thunks 的许可证位于
+`docs/licenses`。发行 ZIP 只携带运行文件和校验值。

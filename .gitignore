@@ -1,3 +1,13 @@
+/build/
+/out/
+/.vs/
+*.user
+*.obj
+*.pdb
+*.ilk
+*.log
+__pycache__/
+
 # Prerequisites
 *.d
 

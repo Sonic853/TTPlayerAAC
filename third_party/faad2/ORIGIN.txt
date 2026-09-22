@@ -1,0 +1,11 @@
+Source: https://codeload.github.com/knik0/faad2/zip/refs/tags/FAAD2_2_7
+Archive SHA-256: c0ea38f8bdeff2e8e5d436982cfd8235b24ea4db31d2f9087a6c33dcc9b9d440
+Tag: FAAD2_2_7
+Scope: decoder C sources, headers, original notices.
+Local modifications:
+- common.h: rename the MSVC inline lrintf helper to faad_lrintf to avoid a
+  collision with the modern compiler's intrinsic. Keep the original x87 body.
+- mdct.c, syntax.c: convert legacy-encoded comments to UTF-8.
+Build: x86, floating-point output, /O2 /fp:precise /arch:SSE2.
+The wrapper derives original NeAACDecInit2's additional frame-length result
+from AudioSpecificConfig, without changing the public upstream decoder ABI.
